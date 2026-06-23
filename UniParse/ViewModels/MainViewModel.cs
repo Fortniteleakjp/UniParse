@@ -14,11 +14,11 @@ using AssetRipper.Assets.Bundles;
 using AssetRipper.Assets.Collections;
 using AssetRipper.Import.Logging;
 using Microsoft.Win32;
-using UnityFModel.Infrastructure;
-using UnityFModel.Models;
-using UnityFModel.Services;
+using UniParse.Infrastructure;
+using UniParse.Models;
+using UniParse.Services;
 
-namespace UnityFModel.ViewModels;
+namespace UniParse.ViewModels;
 
 public sealed class MainViewModel : ObservableObject
 {
@@ -837,7 +837,7 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             File.AppendAllText(
-                Path.Combine(Path.GetTempPath(), "UnityFModel_load.log"),
+                Path.Combine(Path.GetTempPath(), "UniParse_load.log"),
                 DateTime.Now.ToString("HH:mm:ss") + " " + message + Environment.NewLine);
         }
         catch { /* ignore */ }

@@ -5,7 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
 
-namespace UnityFModel.Controls;
+namespace UniParse.Controls;
 
 /// <summary>A minimal trackball 3D viewer that renders a single <see cref="MeshGeometry3D"/>.</summary>
 public partial class Model3DViewer : UserControl

@@ -1,9 +1,9 @@
 using System;
 using System.Collections.ObjectModel;
 using AssetRipper.Assets;
-using UnityFModel.Infrastructure;
+using UniParse.Infrastructure;
 
-namespace UnityFModel.Models;
+namespace UniParse.Models;
 
 public enum AssetNodeKind
 {

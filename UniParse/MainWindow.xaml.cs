@@ -4,10 +4,10 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using UnityFModel.Models;
-using UnityFModel.ViewModels;
+using UniParse.Models;
+using UniParse.ViewModels;
 
-namespace UnityFModel;
+namespace UniParse;
 
 public partial class MainWindow : Window
 {

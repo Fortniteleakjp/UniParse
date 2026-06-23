@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace UnityFModel.Infrastructure;
+namespace UniParse.Infrastructure;
 
 /// <summary>Minimal INotifyPropertyChanged base for the view models.</summary>
 public abstract class ObservableObject : INotifyPropertyChanged

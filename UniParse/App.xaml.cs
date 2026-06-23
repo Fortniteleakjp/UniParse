@@ -5,7 +5,7 @@ using System.Runtime.Loader;
 using System.Windows;
 using System.Windows.Threading;
 
-namespace UnityFModel;
+namespace UniParse;
 
 public partial class App : Application
 {
@@ -31,7 +31,7 @@ public partial class App : Application
     {
         MessageBox.Show(
             $"予期しないエラーが発生しました:\n\n{e.Exception.Message}\n\n{e.Exception.StackTrace}",
-            "UnityFModel", MessageBoxButton.OK, MessageBoxImage.Error);
+            "UniParse", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
     }
 }

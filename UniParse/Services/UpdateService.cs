@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace UnityFModel.Services;
+namespace UniParse.Services;
 
 /// <summary>Information about an available newer release.</summary>
 public sealed record UpdateInfo(Version Version, string TagName, string HtmlUrl, string Notes, string? ZipUrl);
@@ -29,7 +29,7 @@ public sealed class UpdateService
     private static HttpClient CreateClient()
     {
         HttpClient client = new() { Timeout = TimeSpan.FromSeconds(25) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("UnityFModel-Updater/1.0");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("UniParse-Updater/1.0");
         client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
         return client;
     }
@@ -76,7 +76,7 @@ public sealed class UpdateService
         if (string.IsNullOrEmpty(info.ZipUrl))
             throw new InvalidOperationException("このリリースにダウンロード可能な zip アセットがありません。");
 
-        string tempZip = Path.Combine(Path.GetTempPath(), $"UnityFModel_update_{info.Version}.zip");
+        string tempZip = Path.Combine(Path.GetTempPath(), $"UniParse_update_{info.Version}.zip");
 
         using HttpResponseMessage response = await Http.GetAsync(info.ZipUrl, HttpCompletionOption.ResponseHeadersRead, token);
         response.EnsureSuccessStatusCode();
@@ -106,11 +106,11 @@ public sealed class UpdateService
     public void StartUpdaterAndExit(string zipPath)
     {
         string appDir = AppContext.BaseDirectory.TrimEnd('\\', '/');
-        string exePath = Environment.ProcessPath ?? Path.Combine(appDir, "UnityFModel.exe");
+        string exePath = Environment.ProcessPath ?? Path.Combine(appDir, "UniParse.exe");
 
-        string scriptPath = Path.Combine(Path.GetTempPath(), $"UnityFModel_update_{Guid.NewGuid():N}.ps1");
+        string scriptPath = Path.Combine(Path.GetTempPath(), $"UniParse_update_{Guid.NewGuid():N}.ps1");
         string script = $$"""
-$log = Join-Path $env:TEMP 'UnityFModel_update.log'
+$log = Join-Path $env:TEMP 'UniParse_update.log'
 function Log($m) { try { Add-Content -Path $log -Value ((Get-Date).ToString('HH:mm:ss') + ' ' + $m) } catch {} }
 Log '--- updater started ---'
 $exe  = '{{Escape(exePath)}}'
@@ -123,7 +123,7 @@ for ($i = 0; $i -lt 60; $i++) {
     catch { Start-Sleep -Milliseconds 1000 }
 }
 
-$extract = Join-Path $env:TEMP ('UnityFModel_ext_' + [guid]::NewGuid().ToString('N'))
+$extract = Join-Path $env:TEMP ('UniParse_ext_' + [guid]::NewGuid().ToString('N'))
 try {
     Expand-Archive -Path $zip -DestinationPath $extract -Force
     $items = Get-ChildItem -Path $extract

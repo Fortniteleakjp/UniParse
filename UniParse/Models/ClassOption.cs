@@ -1,4 +1,4 @@
-namespace UnityFModel.Models;
+namespace UniParse.Models;
 
 /// <summary>One entry in the class (asset type) filter dropdown.</summary>
 /// <param name="Display">Label shown in the combo box, e.g. "Texture2D (316)".</param>

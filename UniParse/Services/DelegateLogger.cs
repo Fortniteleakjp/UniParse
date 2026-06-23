@@ -1,7 +1,7 @@
 using System;
 using AssetRipper.Import.Logging;
 
-namespace UnityFModel.Services;
+namespace UniParse.Services;
 
 /// <summary>Forwards AssetRipper log messages to a delegate so the UI can show progress.</summary>
 public sealed class DelegateLogger : ILogger

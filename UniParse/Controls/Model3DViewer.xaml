@@ -1,4 +1,4 @@
-<UserControl x:Class="UnityFModel.Controls.Model3DViewer"
+<UserControl x:Class="UniParse.Controls.Model3DViewer"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="#FF202225" ClipToBounds="True" Focusable="True">

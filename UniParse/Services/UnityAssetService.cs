@@ -33,7 +33,7 @@ using AssetRipper.SourceGenerated.Subclasses.UnityTexEnv;
 using SharpGLTF.Schema2;
 using SharpGLTF.Scenes;
 
-namespace UnityFModel.Services;
+namespace UniParse.Services;
 
 /// <summary>What kind of preview an asset produces.</summary>
 public enum PreviewKind { None, Image, Model, Audio, Video }

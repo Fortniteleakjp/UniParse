@@ -1,7 +1,7 @@
 using System;
 using System.Windows.Input;
 
-namespace UnityFModel.Infrastructure;
+namespace UniParse.Infrastructure;
 
 /// <summary>A basic ICommand implementation backed by delegates.</summary>
 public sealed class RelayCommand : ICommand

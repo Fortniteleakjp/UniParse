@@ -1,9 +1,9 @@
-<Window x:Class="UnityFModel.MainWindow"
+<Window x:Class="UniParse.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:avalon="http://icsharpcode.net/sharpdevelop/avalonedit"
-        xmlns:ctrl="clr-namespace:UnityFModel.Controls"
-        Title="UnityFModel — Unity アセットビューア" Height="760" Width="1240"
+        xmlns:ctrl="clr-namespace:UniParse.Controls"
+        Title="UniParse — Unity アセットビューア" Height="760" Width="1240"
         WindowStartupLocation="CenterScreen" AllowDrop="True"
         Drop="OnDrop" DragOver="OnDragOver">
 

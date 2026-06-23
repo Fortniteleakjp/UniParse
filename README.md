@@ -1,4 +1,4 @@
-# UnityFModel
+# UniParse
 
 [AssetRipper](https://github.com/AssetRipper/AssetRipper) をバックエンドに使った、**「FModel」の Unity 版**にあたるデスクトップ用アセットビューアです（WPF / .NET 10 / Windows）。
 
@@ -43,7 +43,7 @@ Unity の **AssetBundle・`.assets`・level・ゲームのデータフォルダ*
 ## 📥 入手と実行（一般ユーザー向け）
 
 ビルド不要で使う場合は、GitHub の **[Releases](https://github.com/Fortniteleakjp/Unity-analysis/releases)** から
-`UnityFModel-win-x64.zip` をダウンロードし、展開して `UnityFModel.exe` を実行してください。
+`UniParse-win-x64.zip` をダウンロードし、展開して `UniParse.exe` を実行してください。
 
 - **.NET のインストールは不要**です（自己完結型ビルド／ランタイム同梱）。
 - 新しいバージョンが出ると、アプリ起動時に**緑のバナーで通知**されます。「⬇ 更新する」を押すと自動で更新できます。
@@ -58,8 +58,8 @@ git clone --recurse-submodules https://github.com/Fortniteleakjp/Unity-analysis.
 cd Unity-analysis
 
 # 2) ビルド & 実行
-dotnet build UnityFModel/UnityFModel.csproj -c Debug
-dotnet run --project UnityFModel/UnityFModel.csproj
+dotnet build UniParse/UniParse.csproj -c Debug
+dotnet run --project UniParse/UniParse.csproj
 ```
 
 - 必要環境：**Windows 10/11 ＋ .NET 10 SDK**、初回はインターネット接続（NuGet 復元）。
@@ -80,7 +80,7 @@ Unity-analysis/
 ├── .github/workflows/release.yml   ← CI（push で自動ビルド & Release 作成）
 ├── .gitmodules / nuget.config       ← submodule 設定 / NuGet フィード
 ├── external/AssetRipper/            ← AssetRipper 本体（submodule）
-└── UnityFModel/
+└── UniParse/
     ├── App.xaml(.cs)                ← ダークテーマ / 例外・アセンブリ解決ハンドラ
     ├── MainWindow.xaml(.cs)         ← UI（ツリー / プレビュー / タブ / 更新バナー）
     ├── Controls/Model3DViewer       ← 3D ビューア

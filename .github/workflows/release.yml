@@ -41,11 +41,11 @@ jobs:
         run: echo "version=1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore
-        run: dotnet restore UnityFModel/UnityFModel.csproj
+        run: dotnet restore UniParse/UniParse.csproj
 
       - name: Publish (self-contained win-x64)
         run: >
-          dotnet publish UnityFModel/UnityFModel.csproj
+          dotnet publish UniParse/UniParse.csproj
           -c Release -r win-x64 --self-contained true
           -p:Version=${{ steps.ver.outputs.version }}
           -p:PublishSingleFile=false
@@ -55,12 +55,12 @@ jobs:
 
       - name: Zip
         shell: pwsh
-        run: Compress-Archive -Path publish/* -DestinationPath UnityFModel-win-x64.zip -Force
+        run: Compress-Archive -Path publish/* -DestinationPath UniParse-win-x64.zip -Force
 
       - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.version }}
-          name: UnityFModel v${{ steps.ver.outputs.version }}
-          files: UnityFModel-win-x64.zip
+          name: UniParse v${{ steps.ver.outputs.version }}
+          files: UniParse-win-x64.zip
           generate_release_notes: true
