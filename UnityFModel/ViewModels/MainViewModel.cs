@@ -330,10 +330,12 @@ public sealed class MainViewModel : ObservableObject
 
             StatusText = $"読み込み完了 — {AssetCount:N0} アセット / Unity {ProjectVersion}";
             OnPropertyChanged(nameof(IsLoaded));
+            TryLog($"[OK] loaded {AssetCount} assets / Unity {ProjectVersion}");
         }
         catch (Exception ex)
         {
             StatusText = "読み込みに失敗しました: " + ex.Message;
+            TryLog("[ERROR] " + ex);
             MessageBox.Show(ex.ToString(), "読み込みエラー", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
@@ -761,5 +763,16 @@ public sealed class MainViewModel : ObservableObject
         foreach (char c in Path.GetInvalidFileNameChars())
             name = name.Replace(c, '_');
         return string.IsNullOrWhiteSpace(name) ? "asset" : name;
+    }
+
+    private static void TryLog(string message)
+    {
+        try
+        {
+            File.AppendAllText(
+                Path.Combine(Path.GetTempPath(), "UnityFModel_load.log"),
+                DateTime.Now.ToString("HH:mm:ss") + " " + message + Environment.NewLine);
+        }
+        catch { /* ignore */ }
     }
 }
