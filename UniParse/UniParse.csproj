@@ -11,6 +11,7 @@
     <AssemblyName>UniParse</AssemblyName>
     <RootNamespace>UniParse</RootNamespace>
     <Product>UniParse</Product>
+    <ApplicationIcon>UniParse.ico</ApplicationIcon>
     <!-- Overridden by CI: -p:Version=1.0.<run_number>. Used by the in-app updater. -->
     <Version>1.0.0</Version>
     <!-- AssetRipper projects are AOT-flagged; we are not publishing AOT, silence noise -->
@@ -47,6 +48,11 @@
 
   <ItemGroup>
     <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Window/taskbar icon (the exe icon comes from ApplicationIcon above). -->
+    <Resource Include="UniParse.png" />
   </ItemGroup>
 
 </Project>

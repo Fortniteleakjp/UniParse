@@ -42,7 +42,7 @@ Unity の **AssetBundle・`.assets`・level・ゲームのデータフォルダ*
 
 ## 📥 入手と実行（一般ユーザー向け）
 
-ビルド不要で使う場合は、GitHub の **[Releases](https://github.com/Fortniteleakjp/Unity-analysis/releases)** から
+ビルド不要で使う場合は、GitHub の **[Releases](https://github.com/Fortniteleakjp/UniParse/releases)** から
 `UniParse-win-x64.zip` をダウンロードし、展開して `UniParse.exe` を実行してください。
 
 - **.NET のインストールは不要**です（自己完結型ビルド／ランタイム同梱）。
@@ -54,8 +54,8 @@ Unity の **AssetBundle・`.assets`・level・ゲームのデータフォルダ*
 
 ```powershell
 # 1) リポジトリ取得（AssetRipper は submodule）
-git clone --recurse-submodules https://github.com/Fortniteleakjp/Unity-analysis.git
-cd Unity-analysis
+git clone --recurse-submodules https://github.com/Fortniteleakjp/UniParse.git
+cd UniParse
 
 # 2) ビルド & 実行
 dotnet build UniParse/UniParse.csproj -c Debug
@@ -76,7 +76,7 @@ dotnet run --project UniParse/UniParse.csproj
 ## 🗂 構成
 
 ```
-Unity-analysis/
+UniParse/
 ├── .github/workflows/release.yml   ← CI（push で自動ビルド & Release 作成）
 ├── .gitmodules / nuget.config       ← submodule 設定 / NuGet フィード
 ├── external/AssetRipper/            ← AssetRipper 本体（submodule）

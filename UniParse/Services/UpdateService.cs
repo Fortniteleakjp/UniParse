@@ -20,7 +20,7 @@ public sealed record UpdateInfo(Version Version, string TagName, string HtmlUrl,
 public sealed class UpdateService
 {
     public const string Owner = "Fortniteleakjp";
-    public const string Repo = "Unity-analysis";
+    public const string Repo = "UniParse";
 
     public static string ReleasesPageUrl => $"https://github.com/{Owner}/{Repo}/releases";
 

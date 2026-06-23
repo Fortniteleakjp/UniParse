@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = _viewModel;
+        TrySetIcon();
 
         // AvalonEdit's Text is not a dependency property, so we push it from the view model manually.
         JsonEditor.SyntaxHighlighting = JsonHighlighting.Definition;
@@ -24,6 +25,16 @@ public partial class MainWindow : Window
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         Loaded += OnLoaded;
+    }
+
+    private void TrySetIcon()
+    {
+        try
+        {
+            Icon = System.Windows.Media.Imaging.BitmapFrame.Create(
+                new Uri("pack://application:,,,/UniParse.png", UriKind.Absolute));
+        }
+        catch { /* the window icon is optional; never let it crash startup */ }
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
