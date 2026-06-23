@@ -29,6 +29,9 @@ public sealed class MainViewModel : ObservableObject
     private SoundPlayer? _soundPlayer;
     private string? _videoTempPath;
 
+    private readonly UpdateService _updateService = new();
+    private UpdateInfo? _pendingUpdate;
+
     public MainViewModel()
     {
         OpenFileCommand = new RelayCommand(async _ => await OpenFileAsync(), _ => !IsBusy);
@@ -50,6 +53,11 @@ public sealed class MainViewModel : ObservableObject
             ApplyFilter();
         }, _ => IsLoaded);
 
+        UpdateNowCommand = new RelayCommand(async _ => await UpdateNowAsync(), _ => UpdateAvailable && !IsBusy);
+        OpenReleaseCommand = new RelayCommand(_ => OpenReleasePage());
+        DismissUpdateCommand = new RelayCommand(_ => UpdateAvailable = false);
+        CheckUpdateCommand = new RelayCommand(async _ => await CheckForUpdatesAsync(silent: false), _ => !IsBusy);
+
         Logger.Add(new DelegateLogger(OnAssetRipperLog));
     }
 
@@ -67,6 +75,10 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand StopAudioCommand { get; }
     public RelayCommand ApplyFilterCommand { get; }
     public RelayCommand ClearFilterCommand { get; }
+    public RelayCommand UpdateNowCommand { get; }
+    public RelayCommand OpenReleaseCommand { get; }
+    public RelayCommand DismissUpdateCommand { get; }
+    public RelayCommand CheckUpdateCommand { get; }
 
     // ===== Tree =====
     private ObservableCollection<AssetTreeNode> _rootNodes = new();
@@ -205,6 +217,82 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public bool IsLoaded => _service.IsLoaded;
+
+    // ===== Update =====
+    private bool _updateAvailable;
+    public bool UpdateAvailable { get => _updateAvailable; private set => SetField(ref _updateAvailable, value); }
+
+    private string _updateBannerText = "";
+    public string UpdateBannerText { get => _updateBannerText; private set => SetField(ref _updateBannerText, value); }
+
+    public string AppVersion => "v" + UpdateService.CurrentVersion;
+
+    public async Task CheckForUpdatesAsync(bool silent)
+    {
+        try
+        {
+            UpdateInfo? info = await _updateService.CheckAsync();
+            if (info is not null)
+            {
+                _pendingUpdate = info;
+                UpdateBannerText = $"🆕 新しいバージョン {info.TagName} が利用可能です（現在 {AppVersion}）";
+                UpdateAvailable = true;
+            }
+            else if (!silent)
+            {
+                StatusText = $"最新バージョンです（{AppVersion}）";
+            }
+        }
+        catch (Exception ex)
+        {
+            if (!silent)
+                StatusText = "更新確認に失敗しました: " + ex.Message;
+        }
+    }
+
+    private async Task UpdateNowAsync()
+    {
+        if (_pendingUpdate is null)
+            return;
+        if (string.IsNullOrEmpty(_pendingUpdate.ZipUrl))
+        {
+            OpenReleasePage();
+            return;
+        }
+
+        MessageBoxResult confirm = MessageBox.Show(
+            $"{_pendingUpdate.TagName} をダウンロードして更新します。\nアプリは一旦終了し、更新後に自動で再起動します。続行しますか？",
+            "アップデート", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            IsBusy = true;
+            BusyMessage = "アップデートをダウンロード中...";
+            string zip = await _updateService.DownloadAsync(
+                _pendingUpdate,
+                new Progress<double>(p => BusyMessage = $"ダウンロード中... {p * 100:F0}%"));
+            BusyMessage = "更新を適用して再起動します...";
+            _updateService.StartUpdaterAndExit(zip);
+            Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            IsBusy = false;
+            MessageBox.Show("アップデートに失敗しました: " + ex.Message, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void OpenReleasePage()
+    {
+        try
+        {
+            string url = _pendingUpdate?.HtmlUrl is { Length: > 0 } u ? u : UpdateService.ReleasesPageUrl;
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch { /* ignore */ }
+    }
 
     // ===== Loading =====
     public async Task OpenPathsAsync(IReadOnlyList<string> paths)

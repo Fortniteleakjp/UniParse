@@ -1,2 +1,14 @@
+# Build output
 bin/
 obj/
+publish/
+[Pp]ublish/
+*.binlog
+
+# Release artifacts
+*.zip
+
+# IDE / user
+.vs/
+*.user
+*.suo

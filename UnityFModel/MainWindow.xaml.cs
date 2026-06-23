@@ -69,6 +69,11 @@ public partial class MainWindow : Window
     /// <summary>If a path was passed on the command line, open it automatically once the window is shown.</summary>
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+#if !DEBUG
+        // Check for a newer release in the background (release builds only).
+        _ = _viewModel.CheckForUpdatesAsync(silent: true);
+#endif
+
         string[] args = Environment.GetCommandLineArgs();
         if (args.Length > 1)
         {

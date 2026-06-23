@@ -10,12 +10,26 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- ===== Update banner ===== -->
+        <Border Grid.Row="0" Background="#FF2E7D32" Padding="10,6"
+                Visibility="{Binding UpdateAvailable, Converter={StaticResource BoolToVis}}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="⬇ 更新する" Command="{Binding UpdateNowCommand}" Margin="0,0,6,0"/>
+                    <Button Content="リリースページ" Command="{Binding OpenReleaseCommand}" Margin="0,0,6,0"/>
+                    <Button Content="後で" Command="{Binding DismissUpdateCommand}"/>
+                </StackPanel>
+                <TextBlock Text="{Binding UpdateBannerText}" Foreground="White" VerticalAlignment="Center" FontWeight="SemiBold"/>
+            </DockPanel>
+        </Border>
+
         <!-- ===== Toolbar ===== -->
-        <Border Grid.Row="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+        <Border Grid.Row="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
             <Grid Margin="8,6">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -26,7 +40,8 @@
                 <StackPanel Orientation="Horizontal" Grid.Column="0">
                     <Button Content="📂 ファイルを開く" Command="{Binding OpenFileCommand}" Margin="0,0,6,0"/>
                     <Button Content="🗁 フォルダを開く" Command="{Binding OpenFolderCommand}" Margin="0,0,6,0"/>
-                    <Button Content="✕ 閉じる" Command="{Binding CloseCommand}"/>
+                    <Button Content="✕ 閉じる" Command="{Binding CloseCommand}" Margin="0,0,6,0"/>
+                    <Button Content="🔄 更新を確認" Command="{Binding CheckUpdateCommand}"/>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" Grid.Column="2" HorizontalAlignment="Right">
@@ -46,7 +61,7 @@
         </Border>
 
         <!-- ===== Main ===== -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="360" MinWidth="220"/>
                 <ColumnDefinition Width="Auto"/>
@@ -234,20 +249,21 @@
         </Grid>
 
         <!-- ===== Status bar ===== -->
-        <Border Grid.Row="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+        <Border Grid.Row="3" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
             <Grid Margin="10,4">
                 <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <TextBlock Text="Unity: " Foreground="{StaticResource SubTextBrush}"/>
                     <TextBlock Text="{Binding ProjectVersion}" Margin="0,0,16,0"/>
                     <TextBlock Text="アセット数: " Foreground="{StaticResource SubTextBrush}"/>
-                    <TextBlock Text="{Binding AssetCount, StringFormat=N0}"/>
+                    <TextBlock Text="{Binding AssetCount, StringFormat=N0}" Margin="0,0,16,0"/>
+                    <TextBlock Text="{Binding AppVersion}" Foreground="{StaticResource SubTextBrush}"/>
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- ===== Busy overlay ===== -->
-        <Grid Grid.RowSpan="3" Background="#CC1E1F22" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+        <Grid Grid.RowSpan="4" Background="#CC1E1F22" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
             <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="24" MaxWidth="560" VerticalAlignment="Center" HorizontalAlignment="Center">
                 <StackPanel>

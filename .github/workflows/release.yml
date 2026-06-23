@@ -1,0 +1,66 @@
+name: Build & Release
+
+# Builds the WPF app on every push to the default branch and publishes a
+# self-contained Windows build as a GitHub Release. The in-app updater checks
+# the "latest" release and offers to download & apply it.
+
+on:
+  push:
+    branches: [ main, master ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout (with AssetRipper submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Compute version
+        id: ver
+        shell: bash
+        run: echo "version=1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore UnityFModel/UnityFModel.csproj
+
+      - name: Publish (self-contained win-x64)
+        run: >
+          dotnet publish UnityFModel/UnityFModel.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:Version=${{ steps.ver.outputs.version }}
+          -p:PublishSingleFile=false
+          -p:DebugType=none
+          -p:SatelliteResourceLanguages=en
+          -o publish
+
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path publish/* -DestinationPath UnityFModel-win-x64.zip -Force
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: UnityFModel v${{ steps.ver.outputs.version }}
+          files: UnityFModel-win-x64.zip
+          generate_release_notes: true
