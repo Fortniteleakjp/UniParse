@@ -105,26 +105,42 @@ public sealed class UpdateService
     /// </summary>
     public void StartUpdaterAndExit(string zipPath)
     {
-        string appDir = AppContext.BaseDirectory.TrimEnd('\\');
+        string appDir = AppContext.BaseDirectory.TrimEnd('\\', '/');
         string exePath = Environment.ProcessPath ?? Path.Combine(appDir, "UnityFModel.exe");
-        int pid = Environment.ProcessId;
 
         string scriptPath = Path.Combine(Path.GetTempPath(), $"UnityFModel_update_{Guid.NewGuid():N}.ps1");
         string script = $$"""
-$ErrorActionPreference = 'SilentlyContinue'
-try { Wait-Process -Id {{pid}} -Timeout 120 } catch {}
-Start-Sleep -Seconds 1
-$zip = '{{Escape(zipPath)}}'
+$log = Join-Path $env:TEMP 'UnityFModel_update.log'
+function Log($m) { try { Add-Content -Path $log -Value ((Get-Date).ToString('HH:mm:ss') + ' ' + $m) } catch {} }
+Log '--- updater started ---'
+$exe  = '{{Escape(exePath)}}'
+$zip  = '{{Escape(zipPath)}}'
 $dest = '{{Escape(appDir)}}'
+
+# Wait until the app has fully exited and released its files (max 60s).
+for ($i = 0; $i -lt 60; $i++) {
+    try { $fs = [System.IO.File]::Open($exe, 'Open', 'ReadWrite', 'None'); $fs.Close(); Log 'app released files'; break }
+    catch { Start-Sleep -Milliseconds 1000 }
+}
+
 $extract = Join-Path $env:TEMP ('UnityFModel_ext_' + [guid]::NewGuid().ToString('N'))
-Expand-Archive -Path $zip -DestinationPath $extract -Force
-$items = Get-ChildItem -Path $extract
-if ($items.Count -eq 1 -and $items[0].PSIsContainer) { $src = $items[0].FullName } else { $src = $extract }
-Copy-Item -Path (Join-Path $src '*') -Destination $dest -Recurse -Force
-Remove-Item -Path $extract -Recurse -Force
-Remove-Item -Path $zip -Force
-Start-Process -FilePath '{{Escape(exePath)}}'
-Remove-Item -Path $PSCommandPath -Force
+try {
+    Expand-Archive -Path $zip -DestinationPath $extract -Force
+    $items = Get-ChildItem -Path $extract
+    if ($items.Count -eq 1 -and $items[0].PSIsContainer) { $src = $items[0].FullName } else { $src = $extract }
+    Copy-Item -Path (Join-Path $src '*') -Destination $dest -Recurse -Force
+    Log 'files updated'
+}
+catch {
+    Log ('ERROR applying update: ' + $_.Exception.Message)
+}
+
+try { Remove-Item -Path $extract -Recurse -Force } catch {}
+try { Remove-Item -Path $zip -Force } catch {}
+
+Log 'relaunching app'
+try { Start-Process -FilePath $exe -WorkingDirectory $dest } catch { Log ('relaunch error: ' + $_.Exception.Message) }
+try { Remove-Item -Path $PSCommandPath -Force } catch {}
 """;
         File.WriteAllText(scriptPath, script);
 
@@ -132,8 +148,9 @@ Remove-Item -Path $PSCommandPath -Force
         {
             FileName = "powershell.exe",
             Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{scriptPath}\"",
-            UseShellExecute = false,
-            CreateNoWindow = true,
+            // ShellExecute launches the helper detached from this process, so it survives our exit.
+            UseShellExecute = true,
+            WindowStyle = ProcessWindowStyle.Hidden,
         };
         Process.Start(psi);
     }
