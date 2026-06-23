@@ -172,12 +172,14 @@
                                  Visibility="{Binding HasTextContent, Converter={StaticResource BoolToVis}}">
                             <TextBox Text="{Binding TextContent, Mode=OneWay}" IsReadOnly="True"
                                      FontFamily="Consolas" FontSize="12.5" BorderThickness="0"
+                                     Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
                                      TextWrapping="NoWrap"
                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
                         </TabItem>
                         <TabItem Header="ログ">
                             <TextBox Text="{Binding LogText, Mode=OneWay}" IsReadOnly="True"
                                      FontFamily="Consolas" FontSize="11.5" BorderThickness="0"
+                                     Background="{StaticResource PanelBrush}" Foreground="{StaticResource TextBrush}"
                                      TextWrapping="NoWrap"
                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
                         </TabItem>
