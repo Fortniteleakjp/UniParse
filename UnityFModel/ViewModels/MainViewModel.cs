@@ -88,6 +88,9 @@ public sealed class MainViewModel : ObservableObject
         private set => SetField(ref _rootNodes, value);
     }
 
+    // The complete tree, kept so filtering can swap in a small result tree and restore this.
+    private ObservableCollection<AssetTreeNode> _fullRootNodes = new();
+
     private AssetTreeNode? _selectedNode;
     public AssetTreeNode? SelectedNode
     {
@@ -316,6 +319,7 @@ public sealed class MainViewModel : ObservableObject
             await Task.Run(() => _service.Load(paths));
 
             ObservableCollection<AssetTreeNode> roots = await Task.Run(BuildTree);
+            _fullRootNodes = roots;
             RootNodes = roots;
             foreach (AssetTreeNode root in roots)
                 root.IsExpanded = true;
@@ -366,6 +370,7 @@ public sealed class MainViewModel : ObservableObject
     private void CloseFile()
     {
         _service.Reset();
+        _fullRootNodes = new ObservableCollection<AssetTreeNode>();
         RootNodes = new ObservableCollection<AssetTreeNode>();
         ClassOptions = new ObservableCollection<ClassOption>();
         _selectedClassOption = null;
@@ -723,25 +728,87 @@ public sealed class MainViewModel : ObservableObject
     }
 
     // ===== Filter =====
-    private void ApplyFilter()
+    private void ApplyFilter() => _ = ApplyFilterAsync();
+
+    private async Task ApplyFilterAsync()
     {
+        if (!IsLoaded)
+            return;
+
         string? nameLower = string.IsNullOrWhiteSpace(SearchText) ? null : SearchText.Trim().ToLowerInvariant();
         string? className = SelectedClassOption?.ClassName;
 
-        foreach (AssetTreeNode root in RootNodes)
-            root.ApplyFilter(nameLower, className);
-
+        // No filter -> restore the full tree (cheap: only the collapsed root is realized).
         if (nameLower is null && className is null)
         {
-            if (IsLoaded)
-                StatusText = $"{AssetCount:N0} アセット / Unity {ProjectVersion}";
+            RootNodes = _fullRootNodes;
+            StatusText = $"{AssetCount:N0} アセット / Unity {ProjectVersion}";
+            return;
         }
-        else
+
+        // Build a small result-only tree on a worker thread instead of toggling the whole tree.
+        StatusText = "検索中...";
+        ObservableCollection<AssetTreeNode> filtered = await Task.Run(() => BuildFilteredTree(nameLower, className));
+        RootNodes = filtered;
+
+        int shown = filtered.Count > 0
+            ? filtered[0].Children.Where(g => g.Kind == AssetNodeKind.TypeGroup).Sum(g => g.Children.Count)
+            : 0;
+        string classPart = className ?? "すべてのクラス";
+        string namePart = nameLower is null ? "" : $" / 名前 \"{SearchText}\"";
+        StatusText = $"フィルタ: {classPart}{namePart} — {shown:N0} 件";
+    }
+
+    private ObservableCollection<AssetTreeNode> BuildFilteredTree(string? nameLower, string? className)
+    {
+        const int cap = 3000;
+        Dictionary<string, List<KeyValuePair<IUnityObjectBase, string>>> grouped = new();
+        int total = 0;
+        bool capped = false;
+
+        GameBundle? bundle = _service.GameData?.GameBundle;
+        if (bundle is not null)
         {
-            string classPart = className ?? "すべてのクラス";
-            string namePart = nameLower is null ? "" : $" / 名前 \"{SearchText}\"";
-            StatusText = $"フィルタ中: {classPart}{namePart}";
+            foreach (AssetCollection collection in bundle.FetchAssetCollections())
+            {
+                foreach (IUnityObjectBase asset in collection)
+                {
+                    if (className is not null && !string.Equals(asset.ClassName, className, StringComparison.Ordinal))
+                        continue;
+                    if (nameLower is not null && !asset.GetBestName().ToLowerInvariant().Contains(nameLower))
+                        continue;
+                    if (total >= cap) { capped = true; break; }
+
+                    if (!grouped.TryGetValue(asset.ClassName, out List<KeyValuePair<IUnityObjectBase, string>>? list))
+                    {
+                        list = new List<KeyValuePair<IUnityObjectBase, string>>();
+                        grouped[asset.ClassName] = list;
+                    }
+                    list.Add(new KeyValuePair<IUnityObjectBase, string>(asset, collection.Name));
+                    total++;
+                }
+                if (capped) break;
+            }
         }
+
+        AssetTreeNode root = new($"🔎 検索結果 ({total}{(capped ? "+" : "")} 件)", AssetNodeKind.Bundle) { IsExpanded = true };
+        foreach (KeyValuePair<string, List<KeyValuePair<IUnityObjectBase, string>>> entry in
+                 grouped.OrderBy(e => e.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            AssetTreeNode group = new($"{entry.Key}  ({entry.Value.Count})", AssetNodeKind.TypeGroup) { IsExpanded = true };
+            foreach (KeyValuePair<IUnityObjectBase, string> pair in
+                     entry.Value.OrderBy(p => p.Key.GetBestName(), StringComparer.OrdinalIgnoreCase))
+            {
+                IUnityObjectBase asset = pair.Key;
+                string toolTip = $"{asset.ClassName}\nPathID: {asset.PathID}\nCollection: {pair.Value}";
+                group.Children.Add(new AssetTreeNode(asset.GetBestName(), AssetNodeKind.Asset, asset, toolTip, UnityAssetService.IsPreviewable(asset)));
+            }
+            root.Children.Add(group);
+        }
+        if (capped)
+            root.Children.Add(new AssetTreeNode($"… 上限 {cap:N0} 件まで表示。クラスや名前でさらに絞り込んでください。", AssetNodeKind.Collection));
+
+        return new ObservableCollection<AssetTreeNode> { root };
     }
 
     // ===== Logging =====
