@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>UnityFModel</AssemblyName>
+    <RootNamespace>UnityFModel</RootNamespace>
+    <!-- AssetRipper projects are AOT-flagged; we are not publishing AOT, silence noise -->
+    <IsAotCompatible>false</IsAotCompatible>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- AssetRipper targets net10.0 (non-windows); referencing from net10.0-windows is fine -->
+    <NoWarn>$(NoWarn);NU1701;NETSDK1206</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- High level loading + processing -->
+    <ProjectReference Include="..\external\AssetRipper\Source\AssetRipper.Export.UnityProjects\AssetRipper.Export.UnityProjects.csproj" />
+    <!-- Configuration (FullConfiguration, ImageExportFormat) -->
+    <ProjectReference Include="..\external\AssetRipper\Source\AssetRipper.Export\AssetRipper.Export.csproj" />
+    <!-- Texture / Sprite / Terrain -> DirectBitmap -->
+    <ProjectReference Include="..\external\AssetRipper\Source\AssetRipper.Export.Modules.Textures\AssetRipper.Export.Modules.Textures.csproj" />
+    <!-- Audio decode (AudioClipDecoder, AudioConverter) -->
+    <ProjectReference Include="..\external\AssetRipper\Source\AssetRipper.Export.Modules.Audio\AssetRipper.Export.Modules.Audio.csproj" />
+    <!-- Mesh -> glb (GlbMeshBuilder, GlbWriter) -->
+    <ProjectReference Include="..\external\AssetRipper\Source\AssetRipper.Export.Modules.Models\AssetRipper.Export.Modules.Models.csproj" />
+    <!-- DefaultJsonWalker -->
+    <ProjectReference Include="..\external\AssetRipper\Source\AssetRipper.Export.PrimaryContent\AssetRipper.Export.PrimaryContent.csproj" />
+    <!-- GameData -->
+    <ProjectReference Include="..\external\AssetRipper\Source\AssetRipper.Processing\AssetRipper.Processing.csproj" />
+    <!-- IUnityObjectBase, GameBundle, AssetCollection -->
+    <ProjectReference Include="..\external\AssetRipper\Source\AssetRipper.Assets\AssetRipper.Assets.csproj" />
+    <!-- LocalFileSystem -->
+    <ProjectReference Include="..\external\AssetRipper\Source\AssetRipper.IO.Files\AssetRipper.IO.Files.csproj" />
+    <!-- Logger / ILogger -->
+    <ProjectReference Include="..\external\AssetRipper\Source\AssetRipper.Import\AssetRipper.Import.csproj" />
+    <!-- Extensions (CheckAssetIntegrity, GetImageData, GetBestExtension) -->
+    <ProjectReference Include="..\external\AssetRipper\Source\AssetRipper.SourceGenerated.Extensions\AssetRipper.SourceGenerated.Extensions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AvalonEdit" Version="6.3.1.120" />
+  </ItemGroup>
+
+</Project>
