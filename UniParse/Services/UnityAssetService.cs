@@ -28,6 +28,7 @@ using AssetRipper.SourceGenerated.Classes.ClassID_49;  // ITextAsset
 using AssetRipper.SourceGenerated.Classes.ClassID_74;  // IAnimationClip
 using AssetRipper.SourceGenerated.Classes.ClassID_83;  // IAudioClip
 using AssetRipper.SourceGenerated.Classes.ClassID_329; // IVideoClip
+using AssetRipper.SourceGenerated.Classes.ClassID_128; // IFont
 using AssetRipper.SourceGenerated.Extensions;          // CheckAssetIntegrity, GetBestExtension, MaterialExtensions
 using AssetRipper.SourceGenerated.Subclasses.UnityTexEnv;
 using SharpGLTF.Schema2;
@@ -36,7 +37,7 @@ using SharpGLTF.Scenes;
 namespace UniParse.Services;
 
 /// <summary>What kind of preview an asset produces.</summary>
-public enum PreviewKind { None, Image, Model, Audio, Video }
+public enum PreviewKind { None, Image, Model, Audio, Video, Font }
 
 /// <summary>The result of building a preview for one asset.</summary>
 public sealed record PreviewResult
@@ -47,6 +48,8 @@ public sealed record PreviewResult
     public byte[]? Wav { get; init; }
     public byte[]? Video { get; init; }
     public string VideoExtension { get; init; } = "";
+    public byte[]? Font { get; init; }
+    public string FontExtension { get; init; } = "";
     public string Info { get; init; } = "";
     public string Message { get; init; } = "";
 }
@@ -88,7 +91,7 @@ public sealed class UnityAssetService
     /// <summary>True if the asset has any kind of rich preview (used for tree glyphs).</summary>
     public static bool IsPreviewable(IUnityObjectBase asset)
         => IsImageLike(asset)
-           || asset is IMaterial or IMesh or IAudioClip or IShader or IAnimationClip or IVideoClip
+           || asset is IMaterial or IMesh or IAudioClip or IShader or IAnimationClip or IVideoClip or IFont
            || asset.ClassName is "VideoPlayer";
 
     /// <summary>Builds whatever preview the asset supports (image / model / audio).</summary>
@@ -130,6 +133,18 @@ public sealed class UnityAssetService
 
         if (asset.ClassName is "VideoPlayer" && ResolveReferencedVideoClip(asset) is { } referencedClip)
             return BuildVideo(referencedClip);
+
+        if (asset is IFont font && font.FontData.Length > 0)
+        {
+            string ext = font.GetFontExtension();
+            return new PreviewResult
+            {
+                Kind = PreviewKind.Font,
+                Font = font.FontData,
+                FontExtension = ext,
+                Info = $"{asset.GetBestName()}   •   {ext.ToUpperInvariant()}   •   {font.FontData.Length / 1024:N0} KB",
+            };
+        }
 
         if (asset is IShader or IAnimationClip or ITextAsset)
             return None("このアセットの内容は左のタブ（テキスト / シェーダー / アニメーション）に表示しています。");
@@ -366,6 +381,14 @@ public sealed class UnityAssetService
         if (clip is not null && clip.TryGetContent(out byte[]? data))
             return (data, clip.TryGetExtensionFromPath(out string? e) ? e : "mp4");
         return (null, "bin");
+    }
+
+    /// <summary>Extracts the embedded font file (ttf/otf) for saving.</summary>
+    public static (byte[]? Data, string Extension) TryGetFont(IUnityObjectBase asset)
+    {
+        if (asset is IFont font && font.FontData.Length > 0)
+            return (font.FontData, font.GetFontExtension());
+        return (null, "ttf");
     }
 
     // ===================================================================== //

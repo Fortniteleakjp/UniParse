@@ -144,6 +144,8 @@
                                     Visibility="{Binding ShowAudio, Converter={StaticResource BoolToVis}}"/>
                             <Button Content="🎬 動画を保存" Command="{Binding SaveVideoCommand}" Margin="0,0,6,0"
                                     Visibility="{Binding ShowVideo, Converter={StaticResource BoolToVis}}"/>
+                            <Button Content="🔤 フォント保存" Command="{Binding SaveFontCommand}" Margin="0,0,6,0"
+                                    Visibility="{Binding ShowFont, Converter={StaticResource BoolToVis}}"/>
                             <Button Content="🧾 JSON を保存" Command="{Binding SaveJsonCommand}" Margin="0,0,6,0"/>
                             <Button Content="📝 テキスト保存" Command="{Binding SaveTextCommand}"
                                     Visibility="{Binding HasTextContent, Converter={StaticResource BoolToVis}}"/>
@@ -231,6 +233,21 @@
                                     </StackPanel>
                                 </Border>
                             </Grid>
+
+                            <!-- Font (sample rendered in the actual font) -->
+                            <ScrollViewer Visibility="{Binding ShowFont, Converter={StaticResource BoolToVis}}"
+                                          Background="{StaticResource PanelBrush}" Padding="18"
+                                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding FontInfo}" Foreground="{StaticResource SubTextBrush}" Margin="0,0,0,14"/>
+                                    <TextBlock FontFamily="{Binding PreviewFontFamily}" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap">
+                                        <Run FontSize="30" Text="AaBbCcDd 0123"/><LineBreak/>
+                                        <Run FontSize="22" Text="The quick brown fox jumps over the lazy dog."/><LineBreak/>
+                                        <Run FontSize="22" Text="あいうえお　アイウエオ　日本語サンプル　永国愛"/><LineBreak/>
+                                        <Run FontSize="16" Text="0123456789  !?&amp;@#%（）「」"/>
+                                    </TextBlock>
+                                </StackPanel>
+                            </ScrollViewer>
 
                             <!-- Message / placeholder -->
                             <TextBlock Text="{Binding PreviewMessage}" Foreground="{StaticResource SubTextBrush}"

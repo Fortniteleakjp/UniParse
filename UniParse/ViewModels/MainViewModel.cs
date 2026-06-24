@@ -7,6 +7,7 @@ using System.Media;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using AssetRipper.Assets;
@@ -28,6 +29,7 @@ public sealed class MainViewModel : ObservableObject
     private byte[]? _audioWav;
     private SoundPlayer? _soundPlayer;
     private string? _videoTempPath;
+    private string? _fontTempDir;
 
     private readonly UpdateService _updateService = new();
     private UpdateInfo? _pendingUpdate;
@@ -41,6 +43,7 @@ public sealed class MainViewModel : ObservableObject
         SaveModelCommand = new RelayCommand(_ => SaveModel(), _ => Kind == PreviewKind.Model);
         SaveAudioCommand = new RelayCommand(_ => SaveAudio(), _ => Kind == PreviewKind.Audio);
         SaveVideoCommand = new RelayCommand(_ => SaveVideo(), _ => Kind == PreviewKind.Video);
+        SaveFontCommand = new RelayCommand(_ => SaveFont(), _ => Kind == PreviewKind.Font);
         SaveJsonCommand = new RelayCommand(_ => SaveJson(), _ => !string.IsNullOrEmpty(JsonText));
         SaveTextCommand = new RelayCommand(_ => SaveText(), _ => HasTextContent);
         PlayAudioCommand = new RelayCommand(_ => PlayAudio(), _ => Kind == PreviewKind.Audio && _audioWav is not null);
@@ -69,6 +72,7 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand SaveModelCommand { get; }
     public RelayCommand SaveAudioCommand { get; }
     public RelayCommand SaveVideoCommand { get; }
+    public RelayCommand SaveFontCommand { get; }
     public RelayCommand SaveJsonCommand { get; }
     public RelayCommand SaveTextCommand { get; }
     public RelayCommand PlayAudioCommand { get; }
@@ -118,6 +122,7 @@ public sealed class MainViewModel : ObservableObject
                 OnPropertyChanged(nameof(ShowModel));
                 OnPropertyChanged(nameof(ShowAudio));
                 OnPropertyChanged(nameof(ShowVideo));
+                OnPropertyChanged(nameof(ShowFont));
                 OnPropertyChanged(nameof(ShowMessage));
                 OnPropertyChanged(nameof(ShowInfoOverlay));
             }
@@ -128,6 +133,7 @@ public sealed class MainViewModel : ObservableObject
     public bool ShowModel => Kind == PreviewKind.Model;
     public bool ShowAudio => Kind == PreviewKind.Audio;
     public bool ShowVideo => Kind == PreviewKind.Video;
+    public bool ShowFont => Kind == PreviewKind.Font;
     public bool ShowMessage => Kind == PreviewKind.None;
     public bool ShowInfoOverlay => (Kind == PreviewKind.Image || Kind == PreviewKind.Model) && !string.IsNullOrEmpty(PreviewInfo);
 
@@ -154,6 +160,12 @@ public sealed class MainViewModel : ObservableObject
         private set { if (SetField(ref _videoError, value)) OnPropertyChanged(nameof(HasVideoError)); }
     }
     public bool HasVideoError => !string.IsNullOrEmpty(VideoError);
+
+    private FontFamily? _previewFontFamily;
+    public FontFamily? PreviewFontFamily { get => _previewFontFamily; private set => SetField(ref _previewFontFamily, value); }
+
+    private string _fontInfo = "";
+    public string FontInfo { get => _fontInfo; private set => SetField(ref _fontInfo, value); }
 
     private string _previewInfo = "";
     public string PreviewInfo
@@ -517,6 +529,11 @@ public sealed class MainViewModel : ObservableObject
                 VideoSource = WriteVideoTemp(preview.Video!, preview.VideoExtension);
                 Kind = PreviewKind.Video;
                 break;
+            case PreviewKind.Font:
+                FontInfo = preview.Info;
+                PreviewFontFamily = BuildFontFamily(preview.Font!, preview.FontExtension);
+                Kind = PreviewKind.Font;
+                break;
             default:
                 Kind = PreviewKind.None;
                 break;
@@ -531,6 +548,9 @@ public sealed class MainViewModel : ObservableObject
         VideoInfo = "";
         VideoError = "";
         DeleteVideoTemp();
+        PreviewFontFamily = null;
+        FontInfo = "";
+        DeleteFontTemp();
         PreviewImage = null;
         ModelGeometry = null;
         AudioInfo = "";
@@ -614,6 +634,59 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>Called by the view when the media element cannot decode the video.</summary>
     public void OnVideoPlaybackFailed()
         => VideoError = "この動画形式はこの環境で再生できません（コーデック未対応の可能性）。\n「🎬 動画を保存」で保存して外部プレーヤーで再生してください。";
+
+    // ===== Font =====
+    private FontFamily? BuildFontFamily(byte[] data, string extension)
+    {
+        try
+        {
+            DeleteFontTemp();
+            string dir = Path.Combine(Path.GetTempPath(), "UniParse_fonts", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            string path = Path.Combine(dir, $"font.{extension}");
+            File.WriteAllBytes(path, data);
+            _fontTempDir = dir;
+
+            GlyphTypeface glyph = new(new Uri(path));
+            string family = glyph.Win32FamilyNames.Values.FirstOrDefault()
+                            ?? glyph.FamilyNames.Values.FirstOrDefault()
+                            ?? string.Empty;
+            if (string.IsNullOrEmpty(family))
+                return null;
+
+            return new FontFamily(new Uri(dir + Path.DirectorySeparatorChar), "./#" + family);
+        }
+        catch
+        {
+            return null; // fall back to the default font for the sample text
+        }
+    }
+
+    private void DeleteFontTemp()
+    {
+        if (_fontTempDir is null)
+            return;
+        try { if (Directory.Exists(_fontTempDir)) Directory.Delete(_fontTempDir, true); }
+        catch { /* font may still be loaded; the OS cleans temp later */ }
+        _fontTempDir = null;
+    }
+
+    private void SaveFont()
+    {
+        if (SelectedNode?.Asset is not { } asset)
+            return;
+        (byte[]? data, string ext) = UnityAssetService.TryGetFont(asset);
+        if (data is null)
+            return;
+        SaveFileDialog dialog = new()
+        {
+            Title = "フォントを保存",
+            Filter = $"フォント (*.{ext})|*.{ext}|すべてのファイル (*.*)|*.*",
+            FileName = SanitizeFileName(asset.GetBestName()) + "." + ext,
+        };
+        if (dialog.ShowDialog() == true)
+            File.WriteAllBytes(dialog.FileName, data);
+    }
 
     // ===== Saving =====
     private void SaveImage()
