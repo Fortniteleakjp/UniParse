@@ -2,13 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AssetRipper.Assets;
-using AssetRipper.Assets.Bundles;
 using AssetRipper.Assets.Collections;
+using AssetRipper.Assets.Metadata;
 using AssetRipper.Export.Configuration;
 using AssetRipper.Export.UnityProjects;
 using AssetRipper.Import.Logging;
 using AssetRipper.IO.Files;
 using AssetRipper.Processing;
+using AssetRipper.SourceGenerated.Classes.ClassID_128; // IFont
+using AssetRipper.SourceGenerated.Extensions;          // GetFontExtension
 
 string path = args.Length > 0 ? args[0] : @"C:\YostarGames\BlueArchive_JP";
 
@@ -17,44 +19,61 @@ Console.WriteLine($"Loading {path} ...");
 FullConfiguration settings = new();
 settings.LoadFromDefaultPath();
 GameData gd = new ExportHandler(settings).LoadAndProcess(new[] { path }, LocalFileSystem.Instance);
-GameBundle root = gd.GameBundle;
-Console.WriteLine("Loaded. Analyzing tree shape...\n");
+Console.WriteLine("Loaded. Font analysis:\n");
 
-int maxBundleDepth = 0, totalBundles = 0, maxBundleChildren = 0;
-string deepestPath = "";
-void WalkB(Bundle b, int depth, string p)
+int fontTotal = 0, fontWithData = 0;
+List<string> examples = new();
+foreach (AssetCollection col in gd.GameBundle.FetchAssetCollections())
 {
-    totalBundles++;
-    if (depth > maxBundleDepth) { maxBundleDepth = depth; deepestPath = p; }
-    int children = b.Bundles.Count + b.Collections.Count;
-    maxBundleChildren = Math.Max(maxBundleChildren, children);
-    foreach (Bundle c in b.Bundles)
-        WalkB(c, depth + 1, p + " > " + c.Name);
-}
-WalkB(root, 0, root.Name);
-
-int collCount = 0, maxAssetsInColl = 0, maxClassesInColl = 0, maxAssetsInTypeGroup = 0;
-string biggestGroup = "", biggestColl = "";
-foreach (AssetCollection col in root.FetchAssetCollections())
-{
-    collCount++;
-    if (col.Count > maxAssetsInColl) { maxAssetsInColl = col.Count; biggestColl = col.Name; }
-    List<IGrouping<string, IUnityObjectBase>> groups = col.GroupBy(a => a.ClassName).ToList();
-    maxClassesInColl = Math.Max(maxClassesInColl, groups.Count);
-    foreach (IGrouping<string, IUnityObjectBase> g in groups)
+    foreach (IUnityObjectBase a in col)
     {
-        int n = g.Count();
-        if (n > maxAssetsInTypeGroup) { maxAssetsInTypeGroup = n; biggestGroup = $"{col.Name} / {g.Key}"; }
+        if (a is IFont f)
+        {
+            fontTotal++;
+            if (f.FontData.Length > 0)
+            {
+                fontWithData++;
+                if (examples.Count < 12)
+                    examples.Add($"  Font '{f.GetBestName()}'  {f.GetFontExtension()}  {f.FontData.Length / 1024}KB");
+            }
+        }
     }
 }
 
-int rootDirectChildren = root.Bundles.Count + root.Collections.Count;
+int refCount = 0;
+Dictionary<string, int> fontNamedByClass = new();
+List<string> refExamples = new();
+foreach (AssetCollection col in gd.GameBundle.FetchAssetCollections())
+{
+    foreach (IUnityObjectBase a in col)
+    {
+        if (a is IFont)
+            continue;
+        bool likely = a.GetBestName().Contains("font", StringComparison.OrdinalIgnoreCase)
+                      || a.ClassName.Contains("Font", StringComparison.OrdinalIgnoreCase);
+        if (!likely)
+            continue;
+        fontNamedByClass[a.ClassName] = fontNamedByClass.GetValueOrDefault(a.ClassName) + 1;
+        foreach ((string _, PPtr pptr) in a.FetchDependencies())
+        {
+            if (a.Collection.TryGetAsset(pptr, out IUnityObjectBase? dep) && dep is IFont rf && rf.FontData.Length > 0)
+            {
+                refCount++;
+                if (refExamples.Count < 12)
+                    refExamples.Add($"  {a.ClassName} '{a.GetBestName()}' -> embedded '{rf.GetBestName()}'");
+                break;
+            }
+        }
+    }
+}
 
-Console.WriteLine($"Bundle nesting : maxDepth={maxBundleDepth}, totalBundles={totalBundles}, maxBundleChildren={maxBundleChildren}");
-Console.WriteLine($"Deepest path   : {deepestPath}");
-Console.WriteLine($"ROOT children  : {rootDirectChildren}  (root.Bundles={root.Bundles.Count}, root.Collections={root.Collections.Count})");
-Console.WriteLine($"Collections    : count={collCount}, maxAssetsInColl={maxAssetsInColl} ({biggestColl}), maxClassesInColl={maxClassesInColl}");
-Console.WriteLine($"Biggest group  : {biggestGroup} = {maxAssetsInTypeGroup}");
+Console.WriteLine($"IFont assets: total={fontTotal}, withEmbeddedData(extractable as TTF/OTF)={fontWithData}");
+foreach (string e in examples) Console.WriteLine(e);
+Console.WriteLine($"\nFont-named NON-IFont assets by class (likely TMP etc.):");
+foreach (KeyValuePair<string, int> kv in fontNamedByClass.OrderByDescending(k => k.Value).Take(15))
+    Console.WriteLine($"  {kv.Key}: {kv.Value}");
+Console.WriteLine($"\nFont-named assets referencing an EMBEDDED font (also extractable): {refCount}");
+foreach (string e in refExamples) Console.WriteLine(e);
 
 sealed class DiagLogger : ILogger
 {
