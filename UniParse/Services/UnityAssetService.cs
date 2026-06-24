@@ -135,19 +135,14 @@ public sealed class UnityAssetService
             return BuildVideo(referencedClip);
 
         if (asset is IFont font && font.FontData.Length > 0)
-        {
-            string ext = font.GetFontExtension();
-            return new PreviewResult
-            {
-                Kind = PreviewKind.Font,
-                Font = font.FontData,
-                FontExtension = ext,
-                Info = $"{asset.GetBestName()}   •   {ext.ToUpperInvariant()}   •   {font.FontData.Length / 1024:N0} KB",
-            };
-        }
+            return BuildFontPreview(font);
 
         if (asset is IShader or IAnimationClip or ITextAsset)
             return None("このアセットの内容は左のタブ（テキスト / シェーダー / アニメーション）に表示しています。");
+
+        // e.g. a TMP_FontAsset that references an embedded source Font.
+        if (ResolveReferencedFont(asset) is { } referencedFont)
+            return BuildFontPreview(referencedFont);
 
         return None("この種類のアセットには画像/モデル/音声/動画プレビューがありません。");
     }
@@ -383,12 +378,37 @@ public sealed class UnityAssetService
         return (null, "bin");
     }
 
-    /// <summary>Extracts the embedded font file (ttf/otf) for saving.</summary>
+    /// <summary>Extracts the embedded font file (ttf/otf) for saving (direct or referenced).</summary>
     public static (byte[]? Data, string Extension) TryGetFont(IUnityObjectBase asset)
     {
-        if (asset is IFont font && font.FontData.Length > 0)
-            return (font.FontData, font.GetFontExtension());
-        return (null, "ttf");
+        IFont? font = asset is IFont direct && direct.FontData.Length > 0 ? direct : ResolveReferencedFont(asset);
+        return font is not null ? (font.FontData, font.GetFontExtension()) : (null, "ttf");
+    }
+
+    private static PreviewResult BuildFontPreview(IFont font)
+    {
+        string ext = font.GetFontExtension();
+        return new PreviewResult
+        {
+            Kind = PreviewKind.Font,
+            Font = font.FontData,
+            FontExtension = ext,
+            Info = $"{font.GetBestName()}   •   {ext.ToUpperInvariant()}   •   {font.FontData.Length / 1024:N0} KB",
+        };
+    }
+
+    /// <summary>Finds an embedded font referenced by an asset (e.g. a TMP font's source font).</summary>
+    private static IFont? ResolveReferencedFont(IUnityObjectBase asset)
+    {
+        foreach ((string _, PPtr pptr) in asset.FetchDependencies())
+        {
+            if (asset.Collection.TryGetAsset(pptr, out IUnityObjectBase? dependency)
+                && dependency is IFont font && font.FontData.Length > 0)
+            {
+                return font;
+            }
+        }
+        return null;
     }
 
     // ===================================================================== //
