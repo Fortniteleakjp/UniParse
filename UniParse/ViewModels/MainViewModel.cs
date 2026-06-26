@@ -13,6 +13,7 @@ using System.Windows.Media.Media3D;
 using AssetRipper.Assets;
 using AssetRipper.Assets.Bundles;
 using AssetRipper.Assets.Collections;
+using AssetRipper.Assets.Metadata;
 using AssetRipper.Import.Logging;
 using Microsoft.Win32;
 using UniParse.Infrastructure;
@@ -94,6 +95,9 @@ public sealed class MainViewModel : ObservableObject
 
     // The complete tree, kept so filtering can swap in a small result tree and restore this.
     private ObservableCollection<AssetTreeNode> _fullRootNodes = new();
+
+    // Maps each asset to its node in the full tree, so a clicked JSON reference can jump to it.
+    private Dictionary<IUnityObjectBase, AssetTreeNode> _assetNodeIndex = new(ReferenceEqualityComparer.Instance);
 
     private AssetTreeNode? _selectedNode;
     public AssetTreeNode? SelectedNode
@@ -383,6 +387,7 @@ public sealed class MainViewModel : ObservableObject
     {
         _service.Reset();
         _fullRootNodes = new ObservableCollection<AssetTreeNode>();
+        _assetNodeIndex = new Dictionary<IUnityObjectBase, AssetTreeNode>(ReferenceEqualityComparer.Instance);
         RootNodes = new ObservableCollection<AssetTreeNode>();
         ClassOptions = new ObservableCollection<ClassOption>();
         _selectedClassOption = null;
@@ -401,7 +406,23 @@ public sealed class MainViewModel : ObservableObject
         GameBundle? bundle = _service.GameData?.GameBundle;
         if (bundle is not null)
             roots.Add(BuildBundle(bundle));
+
+        // Build the asset -> node index (and parent links) so JSON references can navigate.
+        Dictionary<IUnityObjectBase, AssetTreeNode> index = new(ReferenceEqualityComparer.Instance);
+        foreach (AssetTreeNode root in roots)
+            IndexNode(root, null, index);
+        _assetNodeIndex = index;
+
         return roots;
+    }
+
+    private static void IndexNode(AssetTreeNode node, AssetTreeNode? parent, Dictionary<IUnityObjectBase, AssetTreeNode> index)
+    {
+        node.Parent = parent;
+        if (node.Asset is { } asset)
+            index[asset] = node;
+        foreach (AssetTreeNode child in node.Children)
+            IndexNode(child, node, index);
     }
 
     /// <summary>Builds the class (asset type) filter list with per-class counts.</summary>
@@ -563,6 +584,62 @@ public sealed class MainViewModel : ObservableObject
         TextTabHeader = "テキスト";
         AssetHeader = IsLoaded ? "アセットを選択してください" : "ファイルまたはフォルダを開いてください";
         AssetSubHeader = "";
+    }
+
+    // ===== Reference navigation (clicking a PPtr in the JSON view) =====
+
+    /// <summary>Resolves a clicked PPtr against the current asset's collection and jumps to it.</summary>
+    public void NavigateToPPtr(int fileId, long pathId)
+    {
+        if (SelectedNode?.Asset is not { } current)
+            return;
+
+        if (!current.Collection.TryGetAsset(new PPtr(fileId, pathId), out IUnityObjectBase? target))
+        {
+            StatusText = $"参照先が読み込まれていません（FileID {fileId} / PathID {pathId}）。";
+            return;
+        }
+
+        NavigateToAsset(target);
+    }
+
+    /// <summary>Raised when the view should expand to, select and scroll a node into view.</summary>
+    public event Action<AssetTreeNode>? NavigateToNodeRequested;
+
+    /// <summary>Selects and reveals the given asset's node in the structure tree.</summary>
+    public void NavigateToAsset(IUnityObjectBase target)
+    {
+        if (!_assetNodeIndex.TryGetValue(target, out AssetTreeNode? node))
+        {
+            StatusText = "参照先アセットがツリー内に見つかりませんでした。";
+            return;
+        }
+
+        // If a filtered (search) tree is shown, restore the full tree so the path is reachable.
+        if (!ReferenceEquals(RootNodes, _fullRootNodes))
+            RootNodes = _fullRootNodes;
+
+        // Make sure the whole branch is marked visible (a prior filter may have hidden it).
+        for (AssetTreeNode? p = node.Parent; p is not null; p = p.Parent)
+            p.IsVisible = true;
+        node.IsVisible = true;
+
+        StatusText = $"参照へ移動しました → {target.GetBestName()}  ({target.ClassName})";
+
+        // The view walks the container tree (expand -> select -> scroll); it owns the realization timing.
+        NavigateToNodeRequested?.Invoke(node);
+    }
+
+    /// <summary>Describes a PPtr's target for a hover tooltip in the JSON view.</summary>
+    public string? DescribePPtr(int fileId, long pathId)
+    {
+        if (SelectedNode?.Asset is not { } current)
+            return null;
+
+        if (current.Collection.TryGetAsset(new PPtr(fileId, pathId), out IUnityObjectBase? target))
+            return $"→ {target.GetBestName()}  ({target.ClassName})\nPathID {target.PathID}  •  {target.Collection.Name}\nクリックで移動";
+
+        return $"⚠ 参照先が読み込まれていません\nFileID {fileId}  •  PathID {pathId}";
     }
 
     private static BitmapSource LoadBitmap(byte[] png)

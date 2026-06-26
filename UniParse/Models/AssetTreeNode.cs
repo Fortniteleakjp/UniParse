@@ -40,6 +40,9 @@ public sealed class AssetTreeNode : ObservableObject
     public string? ToolTip { get; }
     public bool IsImageLike { get; }
 
+    /// <summary>Parent node, set while indexing the tree. Null for roots.</summary>
+    public AssetTreeNode? Parent { get; internal set; }
+
     public ObservableCollection<AssetTreeNode> Children { get; } = new();
 
     /// <summary>Small leading glyph shown in the tree.</summary>

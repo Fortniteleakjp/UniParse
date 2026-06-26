@@ -88,11 +88,10 @@
                             </ItemsPanelTemplate>
                         </TreeView.ItemsPanel>
                         <TreeView.ItemContainerStyle>
-                            <Style TargetType="TreeViewItem">
+                            <Style TargetType="TreeViewItem" BasedOn="{StaticResource DarkTreeViewItem}">
                                 <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
-                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
                                 <Setter Property="Visibility" Value="{Binding IsVisible, Converter={StaticResource BoolToVis}}"/>
-                                <Setter Property="Padding" Value="2,1"/>
                                 <Setter Property="ItemsPanel">
                                     <Setter.Value>
                                         <ItemsPanelTemplate>
@@ -164,11 +163,22 @@
                     <!-- Data tabs -->
                     <TabControl Grid.Column="0" Background="{StaticResource BgBrush}" BorderThickness="0">
                         <TabItem Header="JSON">
-                            <avalon:TextEditor x:Name="JsonEditor"
-                                               IsReadOnly="True" ShowLineNumbers="True" WordWrap="False"
-                                               FontFamily="Consolas" FontSize="12.5"
-                                               Background="{StaticResource PanelBrush}" Foreground="#FFD4D4D4"
-                                               HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"/>
+                            <DockPanel>
+                                <Border DockPanel.Dock="Top" Background="{StaticResource Panel2Brush}"
+                                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="10,5">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Ellipse Width="9" Height="9" Fill="{StaticResource LinkBrush}" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                        <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource SubTextBrush}">
+                                            <Run Foreground="{StaticResource LinkBrush}" FontWeight="SemiBold" Text="参照リンク"/><Run Text=" をクリックすると該当アセットへ移動します（マウスオーバーで参照先を表示）"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Border>
+                                <avalon:TextEditor x:Name="JsonEditor"
+                                                   IsReadOnly="True" ShowLineNumbers="True" WordWrap="False"
+                                                   FontFamily="Consolas" FontSize="13"
+                                                   Background="{StaticResource PanelBrush}" Foreground="#FFD4D4D4"
+                                                   HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"/>
+                            </DockPanel>
                         </TabItem>
                         <TabItem Header="{Binding TextTabHeader}"
                                  Visibility="{Binding HasTextContent, Converter={StaticResource BoolToVis}}">
