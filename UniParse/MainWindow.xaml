@@ -11,6 +11,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -60,8 +61,17 @@
             </Grid>
         </Border>
 
+        <!-- ===== Compatibility diagnostic ===== -->
+        <Border Grid.Row="2" Background="#FF5C4310" Padding="10,7"
+                Visibility="{Binding HasCompatibilityWarning, Converter={StaticResource BoolToVis}}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="⚠" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding CompatibilityWarning}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
         <!-- ===== Main ===== -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="360" MinWidth="220"/>
                 <ColumnDefinition Width="Auto"/>
@@ -278,7 +288,7 @@
         </Grid>
 
         <!-- ===== Status bar ===== -->
-        <Border Grid.Row="3" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+        <Border Grid.Row="4" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
             <Grid Margin="10,4">
                 <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
@@ -292,7 +302,7 @@
         </Border>
 
         <!-- ===== Busy overlay ===== -->
-        <Grid Grid.RowSpan="4" Background="#CC1E1F22" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
+        <Grid Grid.RowSpan="5" Background="#CC1E1F22" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}">
             <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="24" MaxWidth="560" VerticalAlignment="Center" HorizontalAlignment="Center">
                 <StackPanel>

@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using AssetRipper.Assets;
 using AssetRipper.Assets.Metadata;
+using AssetRipper.Primitives;
 using AssetRipper.Export.Configuration;
 using AssetRipper.Export.Modules.Audio;
 using AssetRipper.Export.Modules.Models;
@@ -31,6 +32,7 @@ using AssetRipper.SourceGenerated.Classes.ClassID_329; // IVideoClip
 using AssetRipper.SourceGenerated.Classes.ClassID_128; // IFont
 using AssetRipper.SourceGenerated.Extensions;          // CheckAssetIntegrity, GetBestExtension, MaterialExtensions
 using AssetRipper.SourceGenerated.Subclasses.UnityTexEnv;
+using Cpp2IlApi = Cpp2IL.Core.Cpp2IlApi;
 using SharpGLTF.Schema2;
 using SharpGLTF.Scenes;
 
@@ -61,6 +63,7 @@ public sealed record PreviewResult
 public sealed class UnityAssetService
 {
     public GameData? GameData { get; private set; }
+    public Il2CppMetadataDiagnostic? Il2CppMetadata { get; private set; }
 
     public bool IsLoaded => GameData is not null;
 
@@ -68,15 +71,81 @@ public sealed class UnityAssetService
 
     public void Load(IReadOnlyList<string> paths)
     {
+        Il2CppMetadata = Il2CppMetadataDiagnostic.Inspect(paths);
+        if (Il2CppMetadata is { IsProtectedOrUnsupported: true } diagnostic)
+        {
+            ApplicationLogger.Warning("Compatibility", diagnostic.UserMessage + $" Path={diagnostic.MetadataPath}; Size={diagnostic.MetadataLength:N0} bytes");
+            ApplicationLogger.Info(
+                "Compatibility",
+                diagnostic.HasRecoverableXorKey
+                    ? $"A simple repeating-XOR key candidate was found: {diagnostic.RepeatingXorKey}."
+                    : "No one- to four-byte repeating-XOR key matched the IL2CPP header. Runtime or stronger encryption is likely required.");
+        }
+
         FullConfiguration settings = new();
         settings.LoadFromDefaultPath();
+        ApplyDetectedDefaultVersion(paths, settings);
         ExportHandler handler = new(settings);
         GameData = handler.LoadAndProcess(paths, LocalFileSystem.Instance);
+    }
+
+    /// <summary>
+    /// Addressables bundles sometimes deliberately store <c>0.0.0</c> as their
+    /// Unity version. AssetRipper then treats their objects as pre-3.5 assets and
+    /// returns UnreadableObject instances. For a Windows game install we can get
+    /// the actual version from UnityPlayer.dll and use it only as that fallback.
+    /// </summary>
+    private static void ApplyDetectedDefaultVersion(IReadOnlyList<string> paths, FullConfiguration settings)
+    {
+        if (settings.ImportSettings.DefaultVersion != default)
+            return;
+
+        foreach (string input in paths)
+        {
+            string? root = GetWindowsGameRoot(input);
+            if (root is null)
+                continue;
+
+            string? dataDirectory = Directory.EnumerateDirectories(root, "*_Data", SearchOption.TopDirectoryOnly)
+                .FirstOrDefault();
+            string unityPlayerPath = Path.Combine(root, "UnityPlayer.dll");
+            if (dataDirectory is null || !File.Exists(unityPlayerPath))
+                continue;
+
+            try
+            {
+                UnityVersion version = Cpp2IlApi.DetermineUnityVersion(unityPlayerPath, dataDirectory);
+                if (version == default)
+                    continue;
+
+                settings.ImportSettings.DefaultVersion = version;
+                ApplicationLogger.Info("Compatibility", $"Stripped AssetBundle versions will use detected Unity version {version}.");
+                return;
+            }
+            catch (Exception ex)
+            {
+                ApplicationLogger.Debug("Compatibility", $"Could not detect a fallback Unity version: {ex.Message}");
+            }
+        }
+    }
+
+    private static string? GetWindowsGameRoot(string input)
+    {
+        if (File.Exists(input))
+            return Path.GetDirectoryName(input);
+        if (!Directory.Exists(input))
+            return null;
+
+        DirectoryInfo directory = new(input);
+        return directory.Name.EndsWith("_Data", StringComparison.OrdinalIgnoreCase)
+            ? directory.Parent?.FullName
+            : directory.FullName;
     }
 
     public void Reset()
     {
         GameData = null;
+        Il2CppMetadata = null;
         System.GC.Collect();
     }
 

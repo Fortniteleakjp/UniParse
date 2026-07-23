@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Media;
@@ -37,6 +38,7 @@ public sealed class MainViewModel : ObservableObject
 
     public MainViewModel()
     {
+        ApplicationLogger.Info("MainViewModel", "Main view model initialized.");
         OpenFileCommand = new RelayCommand(async _ => await OpenFileAsync(), _ => !IsBusy);
         OpenFolderCommand = new RelayCommand(async _ => await OpenFolderAsync(), _ => !IsBusy);
         CloseCommand = new RelayCommand(_ => CloseFile(), _ => IsLoaded && !IsBusy);
@@ -212,6 +214,11 @@ public sealed class MainViewModel : ObservableObject
     private string _logText = "";
     public string LogText { get => _logText; private set => SetField(ref _logText, value); }
 
+    private string _compatibilityWarning = "";
+    public string CompatibilityWarning { get => _compatibilityWarning; private set => SetField(ref _compatibilityWarning, value); }
+
+    public bool HasCompatibilityWarning => !string.IsNullOrEmpty(CompatibilityWarning);
+
     private string _projectVersion = "-";
     public string ProjectVersion { get => _projectVersion; private set => SetField(ref _projectVersion, value); }
 
@@ -250,20 +257,24 @@ public sealed class MainViewModel : ObservableObject
     {
         try
         {
+            ApplicationLogger.Debug("Update", $"Checking for updates. Silent={silent}");
             UpdateInfo? info = await _updateService.CheckAsync();
             if (info is not null)
             {
+                ApplicationLogger.Info("Update", $"Update available: {info.TagName}");
                 _pendingUpdate = info;
                 UpdateBannerText = $"🆕 新しいバージョン {info.TagName} が利用可能です（現在 {AppVersion}）";
                 UpdateAvailable = true;
             }
             else if (!silent)
             {
+                ApplicationLogger.Info("Update", "No update is available.");
                 StatusText = $"最新バージョンです（{AppVersion}）";
             }
         }
         catch (Exception ex)
         {
+            ApplicationLogger.Error("Update", "Update check failed.", ex);
             if (!silent)
                 StatusText = "更新確認に失敗しました: " + ex.Message;
         }
@@ -287,6 +298,7 @@ public sealed class MainViewModel : ObservableObject
 
         try
         {
+            ApplicationLogger.Info("Update", $"Downloading update {_pendingUpdate.TagName}.");
             IsBusy = true;
             BusyMessage = "アップデートをダウンロード中...";
             string zip = await _updateService.DownloadAsync(
@@ -294,10 +306,12 @@ public sealed class MainViewModel : ObservableObject
                 new Progress<double>(p => BusyMessage = $"ダウンロード中... {p * 100:F0}%"));
             BusyMessage = "更新を適用して再起動します...";
             _updateService.StartUpdaterAndExit(zip);
+            ApplicationLogger.Info("Update", "Updater started; shutting down the application.");
             Application.Current.Shutdown();
         }
         catch (Exception ex)
         {
+            ApplicationLogger.Error("Update", "Update installation failed.", ex);
             IsBusy = false;
             MessageBox.Show("アップデートに失敗しました: " + ex.Message, "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -308,9 +322,10 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             string url = _pendingUpdate?.HtmlUrl is { Length: > 0 } u ? u : UpdateService.ReleasesPageUrl;
+            ApplicationLogger.Info("Update", $"Opening release page: {url}");
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
         }
-        catch { /* ignore */ }
+        catch (Exception ex) { ApplicationLogger.Error("Update", "Could not open the release page.", ex); }
     }
 
     // ===== Loading =====
@@ -320,9 +335,13 @@ public sealed class MainViewModel : ObservableObject
             return;
 
         IsBusy = true;
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        ApplicationLogger.Info("Load", $"Starting load for {paths.Count} path(s): {string.Join(" | ", paths)}");
         BusyMessage = "Unity ファイルを読み込み中...";
         _log.Clear();
         LogText = "";
+        CompatibilityWarning = "";
+        OnPropertyChanged(nameof(HasCompatibilityWarning));
         StatusText = "読み込み中...";
         ResetDetail();
         RootNodes = new ObservableCollection<AssetTreeNode>();
@@ -342,6 +361,7 @@ public sealed class MainViewModel : ObservableObject
 
             ProjectVersion = _service.ProjectVersion;
             AssetCount = _service.GameData?.GameBundle.FetchAssetCollections().Sum(c => c.Count) ?? 0;
+            ApplyCompatibilityDiagnostic(_service.Il2CppMetadata);
 
             List<ClassOption> classOptions = await Task.Run(BuildClassOptions);
             ClassOptions = new ObservableCollection<ClassOption>(classOptions);
@@ -350,17 +370,18 @@ public sealed class MainViewModel : ObservableObject
 
             StatusText = $"読み込み完了 — {AssetCount:N0} アセット / Unity {ProjectVersion}";
             OnPropertyChanged(nameof(IsLoaded));
-            TryLog($"[OK] loaded {AssetCount} assets / Unity {ProjectVersion}");
+            ApplicationLogger.Info("Load", $"Completed in {stopwatch.Elapsed}. Assets={AssetCount}; Unity={ProjectVersion}; TreeRoots={roots.Count}");
         }
         catch (Exception ex)
         {
             StatusText = "読み込みに失敗しました: " + ex.Message;
-            TryLog("[ERROR] " + ex);
+            ApplicationLogger.Error("Load", $"Failed after {stopwatch.Elapsed}. Paths={string.Join(" | ", paths)}", ex);
             MessageBox.Show(ex.ToString(), "読み込みエラー", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
             IsBusy = false;
+            stopwatch.Stop();
         }
     }
 
@@ -385,6 +406,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void CloseFile()
     {
+        ApplicationLogger.Info("Load", "Closing the current project.");
         _service.Reset();
         _fullRootNodes = new ObservableCollection<AssetTreeNode>();
         _assetNodeIndex = new Dictionary<IUnityObjectBase, AssetTreeNode>(ReferenceEqualityComparer.Instance);
@@ -395,11 +417,26 @@ public sealed class MainViewModel : ObservableObject
         ResetDetail();
         ProjectVersion = "-";
         AssetCount = 0;
+        CompatibilityWarning = "";
+        OnPropertyChanged(nameof(HasCompatibilityWarning));
         StatusText = "ファイルを閉じました。";
         OnPropertyChanged(nameof(IsLoaded));
     }
 
     // ===== Tree building (worker thread) =====
+
+    private void ApplyCompatibilityDiagnostic(Il2CppMetadataDiagnostic? diagnostic)
+    {
+        if (diagnostic is not { IsProtectedOrUnsupported: true })
+            return;
+
+        CompatibilityWarning = diagnostic.UserMessage;
+        OnPropertyChanged(nameof(HasCompatibilityWarning));
+        _log.AppendLine($"[Warning] [Compatibility] {diagnostic.UserMessage}");
+        LogText = _log.ToString();
+        ApplicationLogger.Warning("Compatibility", $"Displayed compatibility warning for {diagnostic.GameProfile ?? "unknown game"}.");
+    }
+
     private ObservableCollection<AssetTreeNode> BuildTree()
     {
         ObservableCollection<AssetTreeNode> roots = new();
@@ -489,6 +526,8 @@ public sealed class MainViewModel : ObservableObject
         }
 
         IUnityObjectBase asset = node.Asset;
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        ApplicationLogger.Debug("Preview", $"Selected asset. Name={asset.GetBestName()}; Class={asset.ClassName}; PathID={asset.PathID}; Collection={asset.Collection.Name}");
         AssetHeader = asset.GetBestName();
         AssetSubHeader = $"{asset.ClassName}   •   PathID {asset.PathID}   •   {asset.Collection.Name}";
 
@@ -496,16 +535,16 @@ public sealed class MainViewModel : ObservableObject
         {
             PreviewResult p;
             try { p = UnityAssetService.BuildPreview(asset); }
-            catch (Exception ex) { p = new PreviewResult { Kind = PreviewKind.None, Message = "プレビュー生成中にエラー: " + ex.Message }; }
+            catch (Exception ex) { ApplicationLogger.Error("Preview", $"Preview generation failed for {asset.ClassName}/{asset.PathID}.", ex); p = new PreviewResult { Kind = PreviewKind.None, Message = "プレビュー生成中にエラー: " + ex.Message }; }
 
             string j;
             try { j = UnityAssetService.GetJson(asset); }
-            catch (Exception ex) { j = "// JSON を生成できませんでした:\n// " + ex.Message; }
+            catch (Exception ex) { ApplicationLogger.Error("Preview", $"JSON generation failed for {asset.ClassName}/{asset.PathID}.", ex); j = "// JSON を生成できませんでした:\n// " + ex.Message; }
 
             UnityAssetService.TextKind tk;
             string t;
             try { (tk, t) = UnityAssetService.GetTextContent(asset); }
-            catch (Exception ex) { tk = UnityAssetService.TextKind.Text; t = "// テキストを取得できませんでした:\n// " + ex.Message; }
+            catch (Exception ex) { ApplicationLogger.Error("Preview", $"Text extraction failed for {asset.ClassName}/{asset.PathID}.", ex); tk = UnityAssetService.TextKind.Text; t = "// テキストを取得できませんでした:\n// " + ex.Message; }
             return (p, j, t, tk);
         });
 
@@ -522,6 +561,7 @@ public sealed class MainViewModel : ObservableObject
             _ => "テキスト",
         };
         ApplyPreview(preview);
+        ApplicationLogger.Debug("Preview", $"Preview ready. Kind={preview.Kind}; Duration={stopwatch.Elapsed}");
     }
 
     private void ApplyPreview(PreviewResult preview)
@@ -964,9 +1004,27 @@ public sealed class MainViewModel : ObservableObject
     // ===== Logging =====
     private void OnAssetRipperLog(LogType type, LogCategory category, string message)
     {
+        string source = $"AssetRipper/{category}";
+        switch (type)
+        {
+            case LogType.Error:
+                ApplicationLogger.Error(source, message);
+                break;
+            case LogType.Warning:
+                ApplicationLogger.Warning(source, message);
+                break;
+            case LogType.Debug:
+            case LogType.Verbose:
+                ApplicationLogger.Debug(source, message);
+                break;
+            default:
+                ApplicationLogger.Info(source, message);
+                break;
+        }
+
         Application.Current?.Dispatcher.InvokeAsync(() =>
         {
-            _log.AppendLine($"[{type}] {message}");
+            _log.AppendLine($"[{type}] [{category}] {message}");
             if (_log.Length > 16000)
                 _log.Remove(0, _log.Length - 12000);
             LogText = _log.ToString();
@@ -982,14 +1040,4 @@ public sealed class MainViewModel : ObservableObject
         return string.IsNullOrWhiteSpace(name) ? "asset" : name;
     }
 
-    private static void TryLog(string message)
-    {
-        try
-        {
-            File.AppendAllText(
-                Path.Combine(Path.GetTempPath(), "UniParse_load.log"),
-                DateTime.Now.ToString("HH:mm:ss") + " " + message + Environment.NewLine);
-        }
-        catch { /* ignore */ }
-    }
 }
